@@ -1,0 +1,23 @@
+{
+  "name": "happy-test",
+  "version": "0.0.0",
+  "description": "Happy testing",
+  "main": "dist/es2015/index.js",
+  "module": "dist/es2015/index.js",
+  "types": "dist/types/index.js",
+  "scripts": {
+    "prepublishOnly": "rm -rf dist && tsc -p tsconfig.dist.json && tsc -p tsconfig.dist.json -m es2015 -t es2015 --outDir dist/es2015",
+    "build": "tsc",
+    "problems": "tsc --noEmit",
+    "test": "node tmp/test/index.js"
+  },
+  "author": "Robbie Pitts <me@robbie-pitts.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@reactivex/rxjs": "^5.4.3",
+    "typescript": "^2.5.3"
+  },
+  "files": [
+    "dist"
+  ]
+}
