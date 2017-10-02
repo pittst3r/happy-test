@@ -1,5 +1,7 @@
 import { Observable } from '@reactivex/rxjs';
-import { group, test } from '../src';
+import { group, test, before } from '../src';
+
+const testWithSetup = before(() => 'foo');
 
 export default group('main', [
   test('assertions that return an observable that emits `true` pass the test',
@@ -13,5 +15,9 @@ export default group('main', [
   test('only the first value from the assertion observable is taken',
     () => () => Observable.from([true, false]),
     () => {}
+  ),
+  testWithSetup('tests with common setup can use `before()`',
+    () => actual => Observable.of(actual() === 'foo'),
+    (setup) => setup
   )
 ]);

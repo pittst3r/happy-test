@@ -9,4 +9,4 @@ function tap(result: IResult, index: number): string {
 }
 
 console.log(`1..${count}`);
-result$.map(tap).subscribe(v => console.log(v));
+result$.map(tap).subscribe(console.log);

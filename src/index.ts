@@ -26,6 +26,15 @@ export function test<T>(name: string, assertion: () => Assertion<T>, actual: () 
     assertion()(actual).first().map(ok => ({ ok, group, test: name }));
 }
 
+export function before<T, U>(beforeFn: () => U): (name: string, assertion: () => Assertion<T>, actual: (before: U) => T) => Test {
+  return (name, assertion, actual) => {
+    return (group) =>
+      assertion()(() => actual(beforeFn()))
+        .first()
+        .map(ok => ({ ok, group, test: name }));
+  }
+}
+
 export function group(name: string, tests: Test[]): IGroup {
   return {
     name,
