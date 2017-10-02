@@ -1,42 +1,46 @@
 import { Observable } from '@reactivex/rxjs';
 
 export interface IResult {
-  description: string;
-  behavior: string;
+  group: string;
+  test: string;
   ok: boolean;
 }
 
-export type Behavior = (description: string) => Observable<IResult>;
+export type Test = (group: string) => Observable<IResult>;
 
-export interface IDescription {
+export interface IGroup {
   name: string;
-  behaviorCount: number;
-  behavior$: Observable<Behavior>;
+  testCount: number;
+  test$: Observable<Test>;
 }
 
-export type Assertion<T> = (actual: () => T) => Observable<boolean>
+export type Assertion<T> = (actual: () => T) => Observable<boolean>;
 
-export function test<T>(behavior: string, assertion: () => Assertion<T>, actual: () => T): Behavior {
-  return function test(description: string): Observable<IResult> {
-    return assertion()(actual).map(ok => ({ ok, description, behavior }));
-  };
+export interface ISuite {
+  count: number;
+  result$: Observable<IResult>;
 }
 
-export function group(name: string, behaviors: Behavior[]): IDescription {
+export function test<T>(name: string, assertion: () => Assertion<T>, actual: () => T): Test {
+  return (group: string): Observable<IResult> =>
+    assertion()(actual).first().map(ok => ({ ok, group, test: name }));
+}
+
+export function group(name: string, tests: Test[]): IGroup {
   return {
     name,
-    behaviorCount: behaviors.length,
-    behavior$: Observable.from(behaviors)
+    testCount: tests.length,
+    test$: Observable.from(tests)
   }
 }
 
-export function suite(descriptions: IDescription[]): { count: number, result$: Observable<IResult> } {
-  let count = descriptions
-    .map(d => d.behaviorCount)
+export function suite(groups: IGroup[]): ISuite {
+  let count = groups
+    .map(d => d.testCount)
     .reduce((count, length) => count + length);
-  let result$ = Observable.of(...descriptions)
-    .flatMap(description =>
-      description.behavior$.flatMap(behavior => behavior(description.name))
+  let result$ = Observable.of(...groups)
+    .flatMap(group =>
+      group.test$.flatMap(test => test(group.name))
     );
 
   return { count, result$ };
