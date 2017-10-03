@@ -1,6 +1,6 @@
 {
   "name": "happy-test",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Happy testing",
   "main": "dist/cjs/index.js",
   "module": "dist/es2015/index.js",
