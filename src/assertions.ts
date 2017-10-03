@@ -15,7 +15,7 @@ export function equals<T>(expectedValue: T): Assertion<T> {
   return actual => toObservable(actual()).first().map(v => v === expectedValue);
 }
 
-export function wait<T, U extends Promise<T>>(assertion: Assertion<T>): Assertion<U> {
+export function eventually<T, U extends Promise<T>>(assertion: Assertion<T>): Assertion<U> {
   return (actual: () => U): Observable<boolean> => {
     let actualAsObservable = toObservable(actual()).first().map(a => () => a);
 
