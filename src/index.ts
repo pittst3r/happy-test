@@ -1,58 +1,109 @@
 import { Observable } from '@reactivex/rxjs';
 
-export interface IResult {
-  group: string;
-  test: string;
-  ok: boolean;
-}
+export type Opaque = {} | null | undefined | void;
 
-export type Test = (group: string) => Observable<IResult>;
+export type Thunk<T> = () => T;
+
+export type Assertion<T> = (actual: T) => Observable<boolean>;
+
+export type Action = (callback: Thunk<void>) => void;
+
+export type Actual<T> = (action: Action) => T;
+
+export interface ITest {
+  name: string;
+  ok$: Observable<boolean>;
+  action: Thunk<void>;
+}
 
 export interface IGroup {
   name: string;
-  testCount: number;
-  test$: Observable<Test>;
+  tests: Observable<ITest>[];
 }
 
-export type Assertion<T> = (actual: () => T) => Observable<boolean>;
+export interface IResult {
+  ok: boolean;
+  index: number;
+  group: string;
+  test: string;
+}
 
 export interface ISuite {
   count: number;
-  result$: Observable<IResult>;
+  run: (cb: (result: IResult) => void) => void;
 }
 
-export function test<T>(name: string, assertion: () => Assertion<T>, actual: () => T): Test {
-  return (group: string): Observable<IResult> =>
-    assertion()(actual).first().map(ok => ({ ok, group, test: name }));
-}
+export function test<T>(name: string, assertion: Thunk<Assertion<T>>, actual: Actual<T>): Observable<ITest> {
+  let sideEffect: Thunk<void> = () => {};
 
-export function before<T, U>(beforeFn: () => U): (name: string, assertion: () => Assertion<T>, actual: (before: U) => T) => Test {
-  return (name, assertion, actual) => {
-    return (group) =>
-      assertion()(() => actual(beforeFn()))
-        .first()
-        .map(ok => ({ ok, group, test: name }));
+  function action(cb: Thunk<void>): void {
+    sideEffect = cb;
   }
+
+  return Observable.defer(() => Observable.of({
+    name,
+    ok$: assertion()(actual(action)),
+    action: sideEffect
+  }));
 }
 
-export function group(name: string, tests: Test[]): IGroup {
+export function before<T, U>(setup: Thunk<U>): (name: string, assertion: Thunk<Assertion<T>>, actual: (setup: U, action: Action) => T) => Observable<ITest> {
+  return (name, assertion, actual) => {
+    let sideEffect: Thunk<void> = () => {};
+
+    function action(cb: Thunk<void>): void {
+      sideEffect = cb;
+    }
+
+    return Observable.defer(() => Observable.of({
+      name,
+      ok$: assertion()(actual(setup(), action)),
+      action: sideEffect
+    }));
+  };
+}
+
+export function group(name: string, ...tests: Observable<ITest>[]): IGroup {
   return {
     name,
-    testCount: tests.length,
-    test$: Observable.from(tests)
-  }
+    tests
+  };
 }
 
 export function suite(groups: IGroup[]): ISuite {
-  let count = groups
-    .map(d => d.testCount)
-    .reduce((count, length) => count + length);
-  let result$ = Observable.of(...groups)
-    .flatMap(group =>
-      group.test$.flatMap(test => test(group.name))
-    );
+  let count = groups.reduce((acc, group) => acc + group.tests.length, 0);
 
-  return { count, result$ };
+  function run(cb: (result: IResult) => void): void {
+    let index = 1;
+    let group$ = Observable.from(groups);
+    let testWithGroup$ = group$.flatMap(combineTestsWithGroup);
+
+    testWithGroup$.subscribe(({ group, test }) => {
+      test.ok$.subscribe(ok => {
+        cb({
+          ok,
+          index: index++,
+          test: test.name,
+          group: group.name
+        });
+      });
+      test.action();
+    });
+  }
+
+  return {
+    count,
+    run
+  };
 }
 
 export * from './assertions';
+
+function combineTestsWithGroup(group: IGroup) {
+  return Observable.from(group.tests)
+    .flatMap(test$ => test$)
+    .map((test) => ({
+      group,
+      test
+    }));
+}

@@ -1,23 +1,33 @@
-import { Observable } from '@reactivex/rxjs';
-import { group, test, before } from '../src';
+import { Subject, Observable } from '@reactivex/rxjs';
+import { group, test, before, equals, eventually, Assertion } from '../src';
 
-const testWithSetup = before(() => 'foo');
+let testWithSetup = before(() => 'foo');
 
-export default group('main', [
-  test('assertions that return an observable that emits `true` pass the test',
-    () => () => Observable.of(true),
-    () => {}
-  ),
-  test('assertions can compare the actual value to an expected value',
-    () => actual => Observable.of(actual() === 'foo'),
+export default group('main',
+  test('simple',
+    () => equals('foo'),
     () => 'foo'
   ),
-  test('only the first value from the assertion observable is taken',
-    () => () => Observable.from([true, false]),
-    () => {}
+  test('promises',
+    () => eventually(equals('foo')),
+    async () => 'foo'
   ),
-  testWithSetup('tests with common setup can use `before()`',
-    () => actual => Observable.of(actual() === 'foo'),
-    (setup) => setup
+  testWithSetup('setup',
+    () => equals('foo'),
+    setup => setup
+  ),
+  test('side effects',
+    () => emitsValue('foo'),
+    action => {
+      let main$ = new Subject<string>();
+
+      action(() => { main$.next('foo'); });
+
+      return main$;
+    }
   )
-]);
+);
+
+function emitsValue<T>(expected: T): Assertion<Observable<T>> {
+  return actual$ => actual$.map(actual => actual === expected);
+}
