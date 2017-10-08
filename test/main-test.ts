@@ -1,33 +1,15 @@
-import { Subject, Observable } from '@reactivex/rxjs';
-import { group, test, before, equals, eventually, Assertion } from '../src';
-
-let testWithSetup = before(() => 'foo');
+import { group, expect } from '../src';
+import { Subject } from '@reactivex/rxjs';
 
 export default group('main',
-  test('simple',
-    () => equals('foo'),
-    () => 'foo'
-  ),
-  test('promises',
-    () => eventually(equals('foo')),
-    async () => 'foo'
-  ),
-  testWithSetup('setup',
-    () => equals('foo'),
-    setup => setup
-  ),
-  test('side effects',
-    () => emitsValue('foo'),
-    action => {
-      let main$ = new Subject<string>();
+  expect(1, test => {
+    test('ok', async () => true);
+  }),
+  expect(1, test => {
+    let subject$ = new Subject<boolean>();
 
-      action(() => { main$.next('foo'); });
+    test('side-effect', () => subject$.first().toPromise());
 
-      return main$;
-    }
-  )
+    subject$.next(true);
+  })
 );
-
-function emitsValue<T>(expected: T): Assertion<Observable<T>> {
-  return actual$ => actual$.map(actual => actual === expected);
-}

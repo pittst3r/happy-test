@@ -1,109 +1,98 @@
-import { Observable } from '@reactivex/rxjs';
+import { Observable, Subject } from '@reactivex/rxjs';
 
-export type Opaque = {} | null | undefined | void;
+export { default as testemAdapter } from './testem-adapter';
 
 export type Thunk<T> = () => T;
 
-export type Assertion<T> = (actual: T) => Observable<boolean>;
+export type Assertion = Promise<boolean>;
 
-export type Action = (callback: Thunk<void>) => void;
+export type Test = (description: string, assertion: Thunk<Assertion>) => void;
 
-export type Actual<T> = (action: Action) => T;
+export type Count = (count: number) => void;
 
-export interface ITest {
-  name: string;
-  ok$: Observable<boolean>;
-  action: Thunk<void>;
+export type Sequence = {
+  (test: Test): void | Promise<void>;
+  count?: number;
+  group?: string;
 }
 
 export interface IGroup {
-  name: string;
-  tests: Observable<ITest>[];
+  count: number;
+  sequence$: Observable<Sequence>;
 }
 
 export interface IResult {
+  description: string;
   ok: boolean;
-  index: number;
-  group: string;
-  test: string;
 }
 
-export interface ISuite {
-  count: number;
-  run: (cb: (result: IResult) => void) => void;
+export interface ISuiteOptions {
+  timeout: number;
 }
 
-export function test<T>(name: string, assertion: Thunk<Assertion<T>>, actual: Actual<T>): Observable<ITest> {
-  let sideEffect: Thunk<void> = () => {};
+export type Report = (result: Observable<IResult>) => void;
 
-  function action(cb: Thunk<void>): void {
-    sideEffect = cb;
-  }
+export function group(group: string, ...sequences: Sequence[]): IGroup {
+  let count = sequences.reduce((acc, sequence) => acc + (sequence.count || 0), 0);
 
-  return Observable.defer(() => Observable.of({
-    name,
-    ok$: assertion()(actual(action)),
-    action: sideEffect
-  }));
-}
-
-export function before<T, U>(setup: Thunk<U>): (name: string, assertion: Thunk<Assertion<T>>, actual: (setup: U, action: Action) => T) => Observable<ITest> {
-  return (name, assertion, actual) => {
-    let sideEffect: Thunk<void> = () => {};
-
-    function action(cb: Thunk<void>): void {
-      sideEffect = cb;
-    }
-
-    return Observable.defer(() => Observable.of({
-      name,
-      ok$: assertion()(actual(setup(), action)),
-      action: sideEffect
-    }));
-  };
-}
-
-export function group(name: string, ...tests: Observable<ITest>[]): IGroup {
-  return {
-    name,
-    tests
-  };
-}
-
-export function suite(groups: IGroup[]): ISuite {
-  let count = groups.reduce((acc, group) => acc + group.tests.length, 0);
-
-  function run(cb: (result: IResult) => void): void {
-    let index = 1;
-    let group$ = Observable.from(groups);
-    let testWithGroup$ = group$.flatMap(combineTestsWithGroup);
-
-    testWithGroup$.subscribe(({ group, test }) => {
-      test.ok$.subscribe(ok => {
-        cb({
-          ok,
-          index: index++,
-          test: test.name,
-          group: group.name
-        });
-      });
-      test.action();
-    });
-  }
+  sequences.forEach(sequence => {
+    sequence.group = group;
+  });
 
   return {
     count,
-    run
+    sequence$: Observable.from(sequences)
   };
 }
 
-export * from './assertions';
+export function expect(count: number, sequence: Sequence): Sequence {
+  sequence.count = count;
 
-function combineTestsWithGroup(group: IGroup) {
-  return Observable.from(group.tests)
-    .flatMap(test$ => test$)
-    .map((test) => ({
-      group,
-      test
-    }));
+  return sequence;
+}
+
+function testFactory(test$$: Subject<Observable<IResult>>, group?: string): Test {
+  return (description, assertion) => {
+    let result$ = Observable.from(assertion())
+      .map(ok => ({
+        ok,
+        description: group ? `${group}: ${description}` : description
+      }));
+
+    test$$.next(result$);
+  };
+}
+
+export function suite(
+  groups: IGroup[],
+  each: (result: IResult) => void,
+  complete: Thunk<void>,
+  options: ISuiteOptions = {
+    timeout: 500
+  }
+) {
+  let test$$ = new Subject<Observable<IResult>>();
+  let group$ = Observable.from(groups);
+  let report$ = new Subject<void>();
+  let expectedCount = groups.reduce((total, group) => total + group.count, 0);
+  let actualCount$ = report$.mapTo(0).scan((count, v) => count + 1, 0);
+  let done$ = actualCount$
+    .startWith(0)
+    .takeWhile(actualCount => actualCount < expectedCount)
+    .max()
+    .map(v => v + 1);
+
+  done$.subscribe(() => {}, () => {}, complete);
+
+  test$$
+    .flatMap(r => r)
+    .takeUntil(done$)
+    .subscribe(r => { each(r); report$.next(); });
+
+  group$
+    .flatMap(group => group.sequence$)
+    .subscribe(sequence => {
+      let test = testFactory(test$$, sequence.group);
+      sequence(test);
+    });
 }

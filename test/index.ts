@@ -1,13 +1,23 @@
-import { suite, IResult } from '../src';
-import mainTest from './main-test';
+import main from './main-test';
+import { IResult, suite } from '../src/index';
 
-let { run, count } = suite([mainTest]);
+console.info('# Happy Test');
 
-function tap(result: IResult): string {
-  return `${result.ok ? 'ok' : 'not ok'} ${result.index} ${result.group}: ${result.test}`;
+let groups = [main];
+let startTime = Date.now();
+let index = 0;
+let exitCode = 0;
+
+function each(result: IResult) {
+  index++;
+  console.info(index.toString(), result.ok ? 'ok' : '️not ok', result.description);
+  if (!result.ok) exitCode = 1;
 }
 
-console.log(`1..${count}`);
-run(result => {
-  console.log(tap(result));
-});
+function complete() {
+  console.info(`1..${index}`);
+  console.info(`# done in ${Date.now() - startTime}ms`);
+  process.exitCode = exitCode;
+}
+
+suite(groups, each, complete, { timeout: 100 });
