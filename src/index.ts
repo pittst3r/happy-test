@@ -1,5 +1,6 @@
 import { Observable, Subject } from '@reactivex/rxjs';
 
+export { default as run } from './run';
 export { default as testemAdapter } from './testem-adapter';
 
 export type Thunk<T> = () => T;
@@ -66,6 +67,7 @@ function testFactory(test$$: Subject<Observable<IResult>>, group?: string): Test
 export function suite(
   groups: IGroup[],
   each: (result: IResult) => void,
+  error: (error: any) => void,
   complete: Thunk<void>,
   options: ISuiteOptions = {
     timeout: 500
@@ -86,8 +88,9 @@ export function suite(
 
   test$$
     .flatMap(r => r)
+    .timeout(options.timeout)
     .takeUntil(done$)
-    .subscribe(r => { each(r); report$.next(); });
+    .subscribe(r => { each(r); report$.next(); }, error);
 
   group$
     .flatMap(group => group.sequence$)

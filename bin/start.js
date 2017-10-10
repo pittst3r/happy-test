@@ -17,6 +17,7 @@ let tscTrigger = ['trigger', projectDir, {
   ],
   command: [tsc],
   stdout: '> tsc-out.log',
+  stderr: '> tsc-out.log',
   chdir: projectDir
 }];
 
@@ -28,6 +29,7 @@ let testTrigger = ['trigger', tmpDir, {
   ],
   command: ['node', test],
   stdout: '> test-out.log',
+  stderr: '> test-out.log',
   chdir: projectDir
 }];
 
