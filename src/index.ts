@@ -25,6 +25,7 @@ export interface IGroup {
 export interface IResult {
   description: string;
   ok: boolean;
+  error?: any;
 }
 
 export interface ISuiteOptions {
@@ -54,10 +55,17 @@ export function expect(count: number, sequence: Sequence): Sequence {
 
 function testFactory(test$$: Subject<Observable<IResult>>, group?: string): Test {
   return (description, assertion) => {
+    let fullDescription = group ? `${group}: ${description}` : description;
+
     let result$ = Observable.from(assertion())
       .map(ok => ({
         ok,
-        description: group ? `${group}: ${description}` : description
+        description: fullDescription
+      }))
+      .catch(error => Observable.of({
+        ok: false,
+        description: fullDescription,
+        error
       }));
 
     test$$.next(result$);
@@ -79,10 +87,9 @@ export function suite(
   let expectedCount = groups.reduce((total, group) => total + group.count, 0);
   let actualCount$ = report$.mapTo(0).scan((count, v) => count + 1, 0);
   let done$ = actualCount$
-    .startWith(0)
+    .startWith(1)
     .takeWhile(actualCount => actualCount < expectedCount)
-    .max()
-    .map(v => v + 1);
+    .max();
 
   done$.subscribe(() => {}, () => {}, complete);
 

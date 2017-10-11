@@ -15,11 +15,16 @@ export default function run(groups: IGroup[], options: ISuiteOptions): void {
     index++;
 
     if (result.ok) {
-      console.info(`${tap(result, index)}`);
+      console.info(tap(result, index));
       return;
     }
 
-    console.info(`%c${tap(result, index)}`, 'color: orange;');
+    if (result.error) {
+      console.error(tap(result, index), '#', result.error.message);
+      return;
+    }
+
+    console.warn(`${tap(result, index)}`);
     exitCode = 1;
   }
 
