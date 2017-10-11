@@ -16,15 +16,14 @@
   "author": "Robbie Pitts <me@robbie-pitts.com>",
   "license": "MIT",
   "devDependencies": {
-    "@reactivex/rxjs": "^5.4.3",
     "fb-watchman": "^2.0.0",
-    "testem": "^1.18.4",
     "typescript": "^2.5.3"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
+    "@reactivex/rxjs": "^5.4.3",
     "@types/socket.io": "^1.4.31",
     "babel-preset-env": "^1.6.0"
   }
